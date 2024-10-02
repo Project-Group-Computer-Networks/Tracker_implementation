@@ -10,7 +10,7 @@ int createTCPIPv4Socket()
     int s=socket(AF_INET,SOCK_STREAM,0);
     return s;
 }
-sockaddr_in createIPv4Address(char* ip, int port) {
+sockaddr_in createIPv4Address(const char* ip, int port) {
     sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_port = htons(port);

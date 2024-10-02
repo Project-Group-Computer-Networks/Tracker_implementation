@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-sockaddr_in createIPv4Address(char* ip,int port);
+sockaddr_in createIPv4Address(const char* ip,int port);
 int createUDPIPv4Socket();
 int createTCPIPv4Socket();
 
