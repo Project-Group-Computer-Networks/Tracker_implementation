@@ -13,7 +13,7 @@ bool Initialize() {
     return true; // No WSAStartup needed in Linux
 }
 
-void SendMsg(int s) {
+void SendMsg(int s, sockaddr_in servaddr) {
     cout << "Chat Name: " << endl;
     string name;
     getline(cin, name);
@@ -22,7 +22,8 @@ void SendMsg(int s) {
     while (true) {
         getline(cin, message);
         string msg = name + ": " + message;
-        int b = send(s, msg.c_str(), msg.length(), 0);
+        int b = sendto(s, msg.c_str(), msg.length(), 0,(sockaddr *) &servaddr,  
+            sizeof(servaddr));
         if (b < 0) {
             cout << "Send failed" << endl;
             break;
@@ -57,14 +58,14 @@ int main() {
     }
 
     cout << "Client" << endl;
-    int s = socket(AF_INET, SOCK_STREAM, 0);
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
     if (s < 0) {
         cout << "Socket creation failed" << endl;
         return 0;
     }
 
     string serveraddress = "127.0.0.1";
-    int port = 12345;
+    int port = 6969;
     sockaddr_in serveraddr;
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_port = htons(port);
@@ -77,7 +78,7 @@ int main() {
     }
 
     cout << "Connected" << endl;
-    thread senderThread(SendMsg, s);
+    thread senderThread(SendMsg, s,serveraddr);
     thread receiverThread(ReceiveMsg, s);
     senderThread.join();
     receiverThread.join();
