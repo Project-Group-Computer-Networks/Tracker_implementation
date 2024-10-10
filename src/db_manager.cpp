@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 
-extern sqlite3* db;
+sqlite3* db=nullptr;
 
 std::vector<Peer> retrievePeersFromDatabase(const std::string& infoHash) {
     std::vector<Peer> peers;
@@ -50,7 +50,7 @@ void initializeDatabase() {
     )";
 
     char* errMsg = 0;
-    if (sqlite3_exec(db, createTableSQL, 0, 0, &errMsg)) {
+    if (sqlite3_exec(db, createTableSQL, NULL, 0, &errMsg)) {
         std::cerr << "SQL error: " << errMsg << std::endl;
         sqlite3_free(errMsg);
     }
