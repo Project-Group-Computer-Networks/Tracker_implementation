@@ -1,98 +1,86 @@
-#include "peer_manager.h"
-#include "db_manager.h"
-#include <iostream>
 #include <arpa/inet.h>
-#include <vector>
 #include <cstring>
-#include <memory>
-#include "custom_bencoder.h"
+#include <iostream>
+#include <vector>
+#include <cstdint> // for fixed-width integer types like uint32_t, uint16_t
+#include "db_manager.h"
+
+// Define ntohll function for 64-bit integers
+uint64_t ntohll(uint64_t value)
+{
+    if (htonl(1) != 1)
+    { // Check if the system is big-endian
+        return value;
+    }
+    return ((uint64_t)ntohl(value & 0xFFFFFFFF) << 32) | ntohl(value >> 32);
+}
 
 void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &clientAddr)
 {
-    std::string announceRequest(buffer, length); // Convert C-style buffer to std::string
-    std::string::const_iterator start = announceRequest.begin();
-
     try
     {
-        // Use bencoder to parse the message (assuming it’s a dictionary)
-        // std::unique_ptr<bencoding::bencode_base> parsed_message = bencoding::make_value(announceRequest, start);
-        bencoding::bencode_dict bd;
-        bd.decode(announceRequest, start);
-        // Check if the parsed message is a dictionary
-
-        // Extract the necessary fields (info_hash, peer_id, port)
-        // auto info_hash_it = dict->find("info_hash");
-        // auto peer_id_it = dict->find("peer_id");
-        // auto port_it = dict->find("port");
-
-        // Extract info_hash, peer_id, and port from the request
-        bencoding::bencode_string info_hash, peer_id, port;
-
-        bencoding::string_subs sa(bd["info_hash"]->encode());
-        info_hash.decode(sa.str, sa.citer);
-        std::string info_hash_str = info_hash.get();
-        bencoding::string_subs sp(bd["port"]->encode());
-        port.decode(sp.str, sp.citer);
-        int port_str = std::stoi(port.get());
-        bencoding::string_subs spi(bd["peer_id"]->encode());
-        peer_id.decode(spi.str, spi.citer);
-        std::string peer_id_str = peer_id.get();
-
-        // std::string info_hash = dynamic_cast<bencoding::bencode_string*>(info_hash_it->second.get())->get();
-        // std::string peer_id = dynamic_cast<bencoding::bencode_string*>(peer_id_it->second.get())->get();
-        // int port = dynamic_cast<bencoding::bencode_integer*>(port_it->second.get())->get();
-
-        // Debugging: Print extracted info (optional)
-        // std::cout << "Received announce request:" << std::endl;
-        // std::cout << "Info Hash: " << info_hash << std::endl;
-        // std::cout << "Peer ID: " << peer_id << std::endl;
-        // std::cout << "Port: " << port << std::endl;
-
-        // Get the list of peers for the given info_hash
-        std::vector<Peer> peers = retrievePeersFromDatabase(info_hash_str);
-
-        // Prepare the response in bencoded format
-        bencoding::bencode_dict response_dict;
-        bencoding::bencode_list peers_list;
-
-        for (const auto &peer : peers)
+        // Check if buffer length matches the expected size
+        if (length < sizeof(AnnounceRequest))
         {
-            bencoding::bencode_dict peer_dict;
-            // peer_dict.insert_or_assign<bencoding::bencode_string>("peer_id", peer.peer_id);
-            peer_dict["peer_id"] = std::make_unique<bencoding::bencode_string>(peer.peer_id);
-            // peer_dict.insert_or_assign<bencoding::bencode_string>("ip", peer.ip);
-            peer_dict["ip"] = std::make_unique<bencoding::bencode_string>(peer.ip);
-            // peer_dict.insert_or_assign<bencoding::bencode_integer>("port", peer.port);
-            peer_dict["port"] = std::make_unique<bencoding::bencode_integer>(peer.port);
-
-            peers_list.push_back<bencoding::bencode_dict>(std::move(peer_dict));
+            throw std::runtime_error("Invalid announce request length");
         }
 
-        // Add the peers list to the response dictionary
-        // response_dict.insert_or_assign<bencoding::bencode_list>("peers", std::move(peers_list));
-        response_dict["peers"] = std::make_unique<bencoding::bencode_list>(std::move(peers_list));
+        AnnounceRequest req;
+        memcpy(&req, buffer, sizeof(AnnounceRequest));
 
-        // Encode the response into a string
-        std::string encoded_response = response_dict.encode();
+        // Convert network byte order to host byte order where necessary
+        req.connection_id = ntohl(req.connection_id);
+        req.action = ntohl(req.action);
+        req.transaction_id = ntohl(req.transaction_id);
+        req.downloaded = ntohll(req.downloaded); // Assuming you have a ntohll for 64-bit
+        req.left = ntohll(req.left);
+        req.uploaded = ntohll(req.uploaded);
+        req.event = ntohl(req.event);
+        req.ip_address = ntohl(req.ip_address);
+        req.key = ntohl(req.key);
+        req.num_want = ntohl(req.num_want);
+        req.port = ntohs(req.port);
 
-        // Send the response back to the client
-        sendPeerList(sockfd, clientAddr, encoded_response, peers);
+        // Extract info_hash and peer_id
+        std::string info_hash(reinterpret_cast<char *>(req.info_hash), sizeof(req.info_hash));
+        std::string peer_id(reinterpret_cast<char *>(req.peer_id), sizeof(req.peer_id));
+
+        // Now use info_hash and peer_id for processing
+        std::vector<Peer> peers = retrievePeersFromDatabase(info_hash);
+
+        // Create a binary response
+        std::vector<uint8_t> response;
+
+        // Add the 4-byte action field
+        uint32_t action_response = htonl(1); // 1 = announce response
+        response.insert(response.end(), reinterpret_cast<uint8_t *>(&action_response), reinterpret_cast<uint8_t *>(&action_response) + sizeof(action_response));
+
+        // Add the 4-byte transaction_id field
+        response.insert(response.end(), reinterpret_cast<uint8_t *>(&req.transaction_id), reinterpret_cast<uint8_t *>(&req.transaction_id) + sizeof(req.transaction_id));
+
+        // Add Interval, Leechers, Seeders (dummy values here)
+        uint32_t interval = htonl(1800); // 1800 seconds for example
+        uint32_t leechers = htonl(0);
+        uint32_t seeders = htonl(0);
+        response.insert(response.end(), reinterpret_cast<uint8_t *>(&interval), reinterpret_cast<uint8_t *>(&interval) + sizeof(interval));
+        response.insert(response.end(), reinterpret_cast<uint8_t *>(&leechers), reinterpret_cast<uint8_t *>(&leechers) + sizeof(leechers));
+        response.insert(response.end(), reinterpret_cast<uint8_t *>(&seeders), reinterpret_cast<uint8_t *>(&seeders) + sizeof(seeders));
+
+        // Add peers in binary format (IP + Port)
+        for (const auto &peer : peers)
+        {
+            uint32_t peer_ip = inet_addr(peer.ip.c_str()); // Convert IP to binary
+            uint16_t peer_port = htons(peer.port);
+
+            response.insert(response.end(), reinterpret_cast<uint8_t *>(&peer_ip), reinterpret_cast<uint8_t *>(&peer_ip) + sizeof(peer_ip));
+            response.insert(response.end(), reinterpret_cast<uint8_t *>(&peer_port), reinterpret_cast<uint8_t *>(&peer_port) + sizeof(peer_port));
+        }
+
+        // Send the response as a char array
+        sendto(sockfd, reinterpret_cast<char *>(response.data()), response.size(), 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
     }
     catch (const std::exception &e)
     {
         std::cerr << "Error processing announce request: " << e.what() << std::endl;
     }
-}
-
-void sendPeerList(int sockfd, sockaddr_in &clientAddr, std::string response, const std::vector<Peer> &peers)
-{
-    // std::string response = "d5:peersl";  // Example response
-
-    // for (const Peer& peer : peers) {
-    //     response += "6:" + peer.ip + std::to_string(peer.port);
-    // }
-    // response += "e";  // End the response
-
-    // Send the response
-    sendto(sockfd, response.c_str(), response.size(), 0, (const struct sockaddr *)&clientAddr, sizeof(clientAddr));
 }
