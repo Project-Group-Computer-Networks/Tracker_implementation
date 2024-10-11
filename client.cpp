@@ -9,26 +9,31 @@
 
 using namespace std;
 
-bool Initialize() {
+bool Initialize()
+{
     return true; // No WSAStartup needed in Linux
 }
 
-void SendMsg(int s, sockaddr_in servaddr) {
+void SendMsg(int s, sockaddr_in servaddr)
+{
     cout << "Chat Name: " << endl;
     string name;
     getline(cin, name);
     string message;
 
-    while (true) {
+    while (true)
+    {
         getline(cin, message);
         string msg = name + ": " + message;
-        int b = sendto(s, msg.c_str(), msg.length(), 0,(sockaddr *) &servaddr,  
-            sizeof(servaddr));
-        if (b < 0) {
+        int b = sendto(s, msg.c_str(), msg.length(), 0, (sockaddr *)&servaddr,
+                       sizeof(servaddr));
+        if (b < 0)
+        {
             cout << "Send failed" << endl;
             break;
         }
-        if (message == "quit") {
+        if (message == "quit")
+        {
             cout << "Stopping application" << endl;
             break;
         }
@@ -36,30 +41,41 @@ void SendMsg(int s, sockaddr_in servaddr) {
     close(s); // Use `close()` in Linux
 }
 
-void ReceiveMsg(int s) {
+void ReceiveMsg(int s)
+{
     char buffer[4096];
 
-    while (true) {
-        int b = recv(s, buffer, sizeof(buffer), 0);
-        if (b <= 0) {
+    while (true)
+    {
+        int b = recvfrom(s, buffer, sizeof(buffer), 0, NULL, NULL);
+        if (b <= 0)
+        {
             cout << "Disconnected" << endl;
             break;
         }
+        for (int i = 0; i < b; ++i)
+        {
+            printf("%02x ", (unsigned char)buffer[i]);
+        }
+        printf("\n");
         string message(buffer, b);
         cout << "Message from server: " << message << endl;
     }
     close(s); // Close socket
 }
 
-int main() {
-    if (!Initialize()) {
+int main()
+{
+    if (!Initialize())
+    {
         cout << "Initialization failed" << endl;
         return 0;
     }
 
     cout << "Client" << endl;
     int s = socket(AF_INET, SOCK_DGRAM, 0);
-    if (s < 0) {
+    if (s < 0)
+    {
         cout << "Socket creation failed" << endl;
         return 0;
     }
@@ -71,14 +87,15 @@ int main() {
     serveraddr.sin_port = htons(port);
     inet_pton(AF_INET, serveraddress.c_str(), &(serveraddr.sin_addr));
 
-    if (connect(s, reinterpret_cast<sockaddr*>(&serveraddr), sizeof(serveraddr)) < 0) {
+    if (connect(s, reinterpret_cast<sockaddr *>(&serveraddr), sizeof(serveraddr)) < 0)
+    {
         cout << "Connection failed" << endl;
         close(s);
         return 0;
     }
 
     cout << "Connected" << endl;
-    thread senderThread(SendMsg, s,serveraddr);
+    thread senderThread(SendMsg, s, serveraddr);
     thread receiverThread(ReceiveMsg, s);
     senderThread.join();
     receiverThread.join();

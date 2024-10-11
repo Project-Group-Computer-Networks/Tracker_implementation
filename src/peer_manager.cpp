@@ -27,8 +27,8 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
 
         AnnounceRequest req;
         memcpy(&req, buffer, sizeof(AnnounceRequest));
-
-        // Convert network byte order to host byte order where necessary
+        // sample Annnouncement:<8-byte Connection ID><4-byte Action (1 for announce)><4-byte Transaction ID><20-byte Info_hash><20-byte Peer ID><8-byte Downloaded><8-byte Left><8-byte Uploaded><4-byte Event><4-byte IP address><4-byte Key><4-byte Num Want><2-byte Port>
+        //  Convert network byte order to host byte order where necessary
         req.connection_id = ntohl(req.connection_id);
         req.action = ntohl(req.action);
         req.transaction_id = ntohl(req.transaction_id);
@@ -36,7 +36,7 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         req.left = ntohll(req.left);
         req.uploaded = ntohll(req.uploaded);
         req.event = ntohl(req.event);
-        req.ip_address = ntohl(req.ip_address);
+        req.ip_address = ntohl(req.ip_address); // may need to change ntohl
         req.key = ntohl(req.key);
         req.num_want = ntohl(req.num_want);
         req.port = ntohs(req.port);
@@ -48,20 +48,24 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         // Now use info_hash and peer_id for processing
         std::vector<Peer> peers = retrievePeersFromDatabase(info_hash);
 
-        // Create a binary response
+        // sample response:<4-byte Action (1 for announce)><4-byte Transaction ID><Interval><Leechers><Seeders><Peer List (IP:Port)>
+        //  Create a binary response
         std::vector<uint8_t> response;
 
         // Add the 4-byte action field
         uint32_t action_response = htonl(1); // 1 = announce response
+        // std::cout << "action_response type: " << action_response << " " << typeid(action_response).name() << std::endl; // Ignore debugging statement
         response.insert(response.end(), reinterpret_cast<uint8_t *>(&action_response), reinterpret_cast<uint8_t *>(&action_response) + sizeof(action_response));
 
         // Add the 4-byte transaction_id field
-        response.insert(response.end(), reinterpret_cast<uint8_t *>(&req.transaction_id), reinterpret_cast<uint8_t *>(&req.transaction_id) + sizeof(req.transaction_id));
-
+        uint32_t tran = htonl(req.transaction_id);
+        response.insert(response.end(), reinterpret_cast<uint8_t *>(&tran), reinterpret_cast<uint8_t *>(&tran) + sizeof(tran));
+        // std::cout << "transaction_id type: " << tran << " " << typeid(tran).name() << std::endl; // Ignore debugging statement
         // Add Interval, Leechers, Seeders (dummy values here)
         uint32_t interval = htonl(1800); // 1800 seconds for example
         uint32_t leechers = htonl(0);
         uint32_t seeders = htonl(0);
+        // std::cout << "interval type: " << interval << " " << typeid(interval).name() << std::endl; // Ignore debugging statement
         response.insert(response.end(), reinterpret_cast<uint8_t *>(&interval), reinterpret_cast<uint8_t *>(&interval) + sizeof(interval));
         response.insert(response.end(), reinterpret_cast<uint8_t *>(&leechers), reinterpret_cast<uint8_t *>(&leechers) + sizeof(leechers));
         response.insert(response.end(), reinterpret_cast<uint8_t *>(&seeders), reinterpret_cast<uint8_t *>(&seeders) + sizeof(seeders));
@@ -75,7 +79,12 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
             response.insert(response.end(), reinterpret_cast<uint8_t *>(&peer_ip), reinterpret_cast<uint8_t *>(&peer_ip) + sizeof(peer_ip));
             response.insert(response.end(), reinterpret_cast<uint8_t *>(&peer_port), reinterpret_cast<uint8_t *>(&peer_port) + sizeof(peer_port));
         }
-
+        // debugging response
+        for (size_t i = 0; i < response.size(); ++i)
+        {
+            printf("%02x ", (unsigned char)response[i]);
+        }
+        printf("\n");
         // Send the response as a char array
         sendto(sockfd, reinterpret_cast<char *>(response.data()), response.size(), 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
     }
