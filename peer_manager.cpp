@@ -2,7 +2,7 @@
 #include "db_manager.h"
 
 using namespace std;
-vector< uint64_t> valid_connection_ids;
+set< uint64_t> valid_connection_ids;
 
 uint64_t generateConnectionID() {
     return ((uint64_t)rand() << 32) | rand();
@@ -17,7 +17,7 @@ void handleConnectRequest(char* buffer, int bytesRcvd, int listenSocket, sockadd
 
                 
                 uint64_t connection_id = generateConnectionID();
-                valid_connection_ids.push_back(connection_id);
+                valid_connection_ids.insert(connection_id);
                 
                 printf("Generated connnection id: %llu\n", (unsigned long long)connection_id);
 
@@ -58,6 +58,11 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         // sample Annnouncement:<8-byte Connection ID><4-byte Action (1 for announce)><4-byte Transaction ID><20-byte Info_hash><20-byte Peer ID><8-byte Downloaded><8-byte Left><8-byte Uploaded><4-byte Event><4-byte IP address><4-byte Key><4-byte Num Want><2-byte Port>
         //  Convert network byte order to host byte order where necessary
         req.connection_id = ntohl(req.connection_id);
+
+        if(valid_connection_ids.find(req.connection_id)==valid_connection_ids.end()) {
+            cout<<"Invalid connection ID\n";
+            return;
+        }
         req.action = ntohl(req.action);
         req.transaction_id = ntohl(req.transaction_id);
         req.downloaded = ntohll(req.downloaded); // Assuming you have a ntohll for 64-bit
