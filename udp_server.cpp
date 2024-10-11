@@ -4,7 +4,7 @@ using namespace std;
 
 void startUDPServer()
 {
-    
+    srand(time(0));
     cout << "Server" << endl;
     int listenSocket=createUDPIPv4Socket();
     if (listenSocket < 0) {
