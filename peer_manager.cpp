@@ -2,46 +2,53 @@
 #include "db_manager.h"
 
 using namespace std;
-set< uint64_t> valid_connection_ids;
+set<uint64_t> valid_connection_ids;
 
-uint64_t generateConnectionID() {
+uint64_t generateConnectionID()
+{
     return ((uint64_t)rand() << 32) | rand();
 }
-void handleConnectRequest(char* buffer, int bytesRcvd, int listenSocket, sockaddr_in& clientAddr, socklen_t addrLen)
+void handleConnectRequest(char *buffer, int bytesRcvd, int listenSocket, sockaddr_in &clientAddr, socklen_t addrLen)
 {
-    if (bytesRcvd>= sizeof(ConnectRequest)) {
-            ConnectRequest* request = reinterpret_cast<ConnectRequest*>(buffer);
+    if (bytesRcvd >= sizeof(ConnectRequest))
+    {
+        ConnectRequest *request = reinterpret_cast<ConnectRequest *>(buffer);
 
-            if (request->protocol_id == PROTOCOL_ID && request->action == ACTION_CONNECT) {
-                cout << "Received a valid connect request" << endl;
+        if (request->protocol_id == PROTOCOL_ID && request->action == ACTION_CONNECT)
+        {
+            cout << "Received a valid connect request" << endl;
 
-                
-                uint64_t connection_id = generateConnectionID();
-                valid_connection_ids.insert(connection_id);
-                
-                printf("Generated connnection id: %llu\n", (unsigned long long)connection_id);
+            uint64_t connection_id = generateConnectionID();
+            valid_connection_ids.insert(connection_id);
 
-                // cout << "Generated connection ID: " << connection_id << endl;
+            printf("Generated connnection id: %llu\n", (unsigned long long)connection_id);
 
-                ConnectResponse response;
-                response.action = ACTION_RESPONSE_CONNECT;
-                response.transaction_id = htonll(request->transaction_id);
-                response.connection_id = htonll(connection_id); // Convert to network byte order
+            // cout << "Generated connection ID: " << connection_id << endl;
 
-                int bytesSent = sendto(listenSocket, reinterpret_cast<char*>(&response), sizeof(response), 0, (sockaddr*)&clientAddr, addrLen);
-                if (bytesSent <= 0) {
-                    cout << "Failed to send response" << endl;
-                } else {
-                    cout << "Sent connect response to client" << endl;
-                }
+            ConnectResponse response;
+            response.action = ACTION_RESPONSE_CONNECT;
+            response.transaction_id = request->transaction_id;
+            response.connection_id = htonll(connection_id); // Convert to network byte order
+
+            int bytesSent = sendto(listenSocket, reinterpret_cast<char *>(&response), sizeof(response), 0, (sockaddr *)&clientAddr, addrLen);
+            if (bytesSent <= 0)
+            {
+                cout << "Failed to send response" << endl;
             }
-             else {
-                cout << "Invalid protocol ID or action in request" << endl;
+            else
+            {
+                cout << "Sent connect response to client" << endl;
             }
-        } 
-        else {
-            cout << "Invalid connect request received" << endl;
         }
+        else
+        {
+            cout << "Invalid protocol ID or action in request" << endl;
+        }
+    }
+    else
+    {
+        cout << "Invalid connect request received" << endl;
+    }
 }
 void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &clientAddr)
 {
@@ -59,8 +66,9 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         //  Convert network byte order to host byte order where necessary
         req.connection_id = ntohl(req.connection_id);
 
-        if(valid_connection_ids.find(req.connection_id)==valid_connection_ids.end()) {
-            cout<<"Invalid connection ID\n";
+        if (valid_connection_ids.find(req.connection_id) == valid_connection_ids.end())
+        {
+            cout << "Invalid connection ID\n";
             return;
         }
         req.action = ntohl(req.action);
@@ -80,6 +88,14 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
 
         // Now use info_hash and peer_id for processing
         std::vector<Peer> peers = retrievePeersFromDatabase(info_hash);
+
+        // Convert IP address from uint32_t to string format (e.g., "192.168.0.1")
+        struct in_addr ip_addr;
+        ip_addr.s_addr = htonl(req.ip_address);  // Convert back to network byte order for string conversion
+        std::string ip_str = inet_ntoa(ip_addr); // Converts to "xxx.xxx.xxx.xxx"
+
+        // now have to store the peer in database
+        storePeerInDatabase(info_hash, peer_id, ip_str, req.port, req.uploaded, req.downloaded, req.left);
 
         // sample response:<4-byte Action (1 for announce)><4-byte Transaction ID><Interval><Leechers><Seeders><Peer List (IP:Port)>
         //  Create a binary response
