@@ -10,6 +10,8 @@
 #include <vector>
 #include <algorithm>
 #include <cstring>
+#include <cstdint>   
+#include <cstdlib>  
 
 sockaddr_in createIPv4Address(const char* ip,int port);
 int createUDPIPv4Socket();
