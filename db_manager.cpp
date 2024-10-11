@@ -1,9 +1,6 @@
 #include "peer_manager.h"
 #include "db_manager.h"
 #include <sqlite3.h>
-#include <iostream>
-#include <vector>
-#include <string.h>
 
 sqlite3* db=nullptr;
 

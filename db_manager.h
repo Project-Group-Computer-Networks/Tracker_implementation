@@ -1,7 +1,5 @@
 #ifndef DB_MANAGER_H
 #define DB_MANAGER_H
-#include <string>
-#include <vector>
 #include "peer_manager.h"
 
 void initializeDatabase();

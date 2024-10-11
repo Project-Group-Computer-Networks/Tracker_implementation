@@ -123,7 +123,7 @@ int main(void) {
         return 5;
     }
 
-    if (response_action == 1) { // Connect response
+    if (response_action == 0) { // Connect response
         uint64_t connection_id;
         memcpy(&connection_id, buf + 8, 8);
         connection_id = ntohll(connection_id); // Receive in host order

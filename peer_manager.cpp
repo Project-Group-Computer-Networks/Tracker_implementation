@@ -1,20 +1,48 @@
-#include <arpa/inet.h>
-#include <cstring>
-#include <iostream>
-#include <vector>
-#include <cstdint> // for fixed-width integer types like uint32_t, uint16_t
+#include "peer_manager.h"
 #include "db_manager.h"
 
-// Define ntohll function for 64-bit integers
-uint64_t ntohll(uint64_t value)
-{
-    if (htonl(1) != 1)
-    { // Check if the system is big-endian
-        return value;
-    }
-    return ((uint64_t)ntohl(value & 0xFFFFFFFF) << 32) | ntohl(value >> 32);
-}
+using namespace std;
+vector< uint64_t> valid_connection_ids;
 
+uint64_t generateConnectionID() {
+    return ((uint64_t)rand() << 32) | rand();
+}
+void handleConnectRequest(char* buffer, int bytesRcvd, int listenSocket, sockaddr_in& clientAddr, socklen_t addrLen)
+{
+    if (bytesRcvd>= sizeof(ConnectRequest)) {
+            ConnectRequest* request = reinterpret_cast<ConnectRequest*>(buffer);
+
+            if (request->protocol_id == PROTOCOL_ID && request->action == ACTION_CONNECT) {
+                cout << "Received a valid connect request" << endl;
+
+                
+                uint64_t connection_id = generateConnectionID();
+                valid_connection_ids.push_back(connection_id);
+                
+                printf("Generated connnection id: %llu\n", (unsigned long long)connection_id);
+
+                // cout << "Generated connection ID: " << connection_id << endl;
+
+                ConnectResponse response;
+                response.action = ACTION_RESPONSE_CONNECT;
+                response.transaction_id = htonll(request->transaction_id);
+                response.connection_id = htonll(connection_id); // Convert to network byte order
+
+                int bytesSent = sendto(listenSocket, reinterpret_cast<char*>(&response), sizeof(response), 0, (sockaddr*)&clientAddr, addrLen);
+                if (bytesSent <= 0) {
+                    cout << "Failed to send response" << endl;
+                } else {
+                    cout << "Sent connect response to client" << endl;
+                }
+            }
+             else {
+                cout << "Invalid protocol ID or action in request" << endl;
+            }
+        } 
+        else {
+            cout << "Invalid connect request received" << endl;
+        }
+}
 void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &clientAddr)
 {
     try
