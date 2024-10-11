@@ -52,6 +52,9 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         //  Create a binary response
         std::vector<uint8_t> response;
 
+        int leechers_net = 0;
+        int seeders_net = 0;
+        countLeechersAndSeeders(info_hash, leechers_net, seeders_net);
         // Add the 4-byte action field
         uint32_t action_response = htonl(1); // 1 = announce response
         // std::cout << "action_response type: " << action_response << " " << typeid(action_response).name() << std::endl; // Ignore debugging statement
@@ -63,8 +66,8 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         // std::cout << "transaction_id type: " << tran << " " << typeid(tran).name() << std::endl; // Ignore debugging statement
         // Add Interval, Leechers, Seeders (dummy values here)
         uint32_t interval = htonl(1800); // 1800 seconds for example
-        uint32_t leechers = htonl(0);
-        uint32_t seeders = htonl(0);
+        uint32_t leechers = htonl(leechers_net);
+        uint32_t seeders = htonl(seeders_net);
         // std::cout << "interval type: " << interval << " " << typeid(interval).name() << std::endl; // Ignore debugging statement
         response.insert(response.end(), reinterpret_cast<uint8_t *>(&interval), reinterpret_cast<uint8_t *>(&interval) + sizeof(interval));
         response.insert(response.end(), reinterpret_cast<uint8_t *>(&leechers), reinterpret_cast<uint8_t *>(&leechers) + sizeof(leechers));

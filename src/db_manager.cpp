@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 #include <iostream>
 #include <vector>
+#include <string.h>
 
 sqlite3* db=nullptr;
 
@@ -75,6 +76,33 @@ void storePeerInDatabase(const std::string& infoHash, const std::string& peerId,
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         std::cerr << "Failed to insert data: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+}
+void countLeechersAndSeeders(const std::string& infoHash, int& leechers, int& seeders) {
+    const char* countSQL = "SELECT CASE WHEN left = 0 THEN 'seeder' ELSE 'leecher' END, COUNT(*) FROM peers WHERE info_hash = ? GROUP BY CASE WHEN left = 0 THEN 'seeder' ELSE 'leecher' END";
+    sqlite3_stmt* stmt;
+
+    leechers = 0;
+    seeders = 0;
+
+    if (sqlite3_prepare_v2(db, countSQL, -1, &stmt, 0) != SQLITE_OK) {
+        std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << std::endl;
+        return;
+    }
+
+    sqlite3_bind_text(stmt, 1, infoHash.c_str(), -1, SQLITE_STATIC);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const unsigned char* type = sqlite3_column_text(stmt, 0);
+        int count = sqlite3_column_int(stmt, 1);
+
+        if (strcmp(reinterpret_cast<const char*>(type), "seeder") == 0) {
+            seeders = count;
+        } else {
+            leechers = count;
+        }
     }
 
     sqlite3_finalize(stmt);
