@@ -54,6 +54,8 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
 {
     try
     {
+        cout << length << endl;
+        cout << sizeof(AnnounceRequest) << endl;
         // Check if buffer length matches the expected size
         if (length < sizeof(AnnounceRequest))
         {
@@ -64,24 +66,52 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         memcpy(&req, buffer, sizeof(AnnounceRequest));
         // sample Annnouncement:<8-byte Connection ID><4-byte Action (1 for announce)><4-byte Transaction ID><20-byte Info_hash><20-byte Peer ID><8-byte Downloaded><8-byte Left><8-byte Uploaded><4-byte Event><4-byte IP address><4-byte Key><4-byte Num Want><2-byte Port>
         //  Convert network byte order to host byte order where necessary
-        req.connection_id = ntohl(req.connection_id);
+        req.connection_id = ntohll(req.connection_id);
 
         if (valid_connection_ids.find(req.connection_id) == valid_connection_ids.end())
         {
             cout << "Invalid connection ID\n";
             return;
         }
-        req.action = ntohl(req.action);
-        req.transaction_id = ntohl(req.transaction_id);
-        req.downloaded = ntohll(req.downloaded); // Assuming you have a ntohll for 64-bit
-        req.left = ntohll(req.left);
-        req.uploaded = ntohll(req.uploaded);
-        req.event = ntohl(req.event);
-        req.ip_address = ntohl(req.ip_address); // may need to change ntohl
-        req.key = ntohl(req.key);
-        req.num_want = ntohl(req.num_want);
-        req.port = ntohs(req.port);
+        uint32_t value_4;
+        uint64_t value_8;
 
+        req.action = 1;
+
+        memcpy(&value_4, &buffer[12], sizeof(uint32_t));
+
+        req.transaction_id = value_4;
+
+        memcpy(&value_8, &buffer[56], sizeof(uint64_t));
+        req.downloaded = ntohll(value_8); // Assuming you have a ntohll for 64-bit
+
+        memcpy(&value_8, &buffer[64], sizeof(uint64_t));
+        req.left = ntohll(value_8);
+
+        memcpy(&value_8, &buffer[72], sizeof(uint64_t));
+        req.uploaded = ntohll(value_8);
+
+        memcpy(&value_4, &buffer[80], sizeof(uint32_t));
+        req.event = ntohl(value_4);
+
+        memcpy(&value_4, &buffer[84], sizeof(uint32_t));
+        req.ip_address = ntohl(value_4);
+        struct in_addr addr;
+        addr.s_addr = req.ip_address;
+        cout << inet_ntoa(addr) << endl;
+
+        memcpy(&value_4, &buffer[88], sizeof(uint32_t));
+        req.key = ntohl(value_4);
+
+        memcpy(&value_4, &buffer[92], sizeof(uint32_t));
+        req.num_want = ntohl(value_4);
+
+        uint16_t value_2;
+        memcpy(&value_2, &buffer[96], sizeof(uint16_t));
+        req.port = ntohs(value_2);
+
+        cout << req.action << " " << req.transaction_id << " " << req.downloaded << " " << req.left << " " << req.uploaded << " " << req.event << " " << inet_ntoa(addr) << " " << req.key << " " << req.num_want << " " << req.port << endl;
+        // cout<<value<<endl;
         // Extract info_hash and peer_id
         std::string info_hash(reinterpret_cast<char *>(req.info_hash), sizeof(req.info_hash));
         std::string peer_id(reinterpret_cast<char *>(req.peer_id), sizeof(req.peer_id));
