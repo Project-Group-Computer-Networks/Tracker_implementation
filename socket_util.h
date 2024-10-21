@@ -14,6 +14,7 @@
 #include <cstdlib>  
 #include <string.h>
 #include <set>
+#include <time.h>
 sockaddr_in createIPv4Address(const char* ip,int port);
 int createUDPIPv4Socket();
 int createTCPIPv4Socket();
