@@ -70,7 +70,7 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         //  Convert network byte order to host byte order where necessary
         /*************************************************************/
 
-        req.connection_id = ntohll(req.connection_id);
+        // req.connection_id = ntohll(req.connection_id);
 
         if (valid_connection_ids.find(req.connection_id) == valid_connection_ids.end())
         {
@@ -90,7 +90,9 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         req.downloaded = ntohll(value_8); // Assuming you have a ntohll for 64-bit
 
         memcpy(&value_8, &buffer[64], sizeof(uint64_t));
+        cout << value_8 << endl;
         req.left = ntohll(value_8);
+        cout << ntohll(value_8) << endl;
 
         memcpy(&value_8, &buffer[72], sizeof(uint64_t));
         req.uploaded = ntohll(value_8);
@@ -141,6 +143,9 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         int leechers_net = 0;
         int seeders_net = 0;
         countLeechersAndSeeders(info_hash, leechers_net, seeders_net);
+
+        // cout << "Leechers: " << leechers_net << " Seeders: " << seeders_net << endl;
+
         // Add the 4-byte action field
         uint32_t action_response = htonl(1); // 1 = announce response
         // std::cout << "action_response type: " << action_response << " " << typeid(action_response).name() << std::endl; // Ignore debugging statement
@@ -171,7 +176,8 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         // debugging response
         for (size_t i = 0; i < response.size(); ++i)
         {
-            printf("%02x ", (unsigned char)response[i]);
+            // printf("%02x ", (unsigned char)response[i]);
+            cout << response[i] << "";
         }
         printf("\n");
         // Send the response as a char array
