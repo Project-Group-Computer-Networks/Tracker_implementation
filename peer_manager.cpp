@@ -64,8 +64,12 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
 
         AnnounceRequest req;
         memcpy(&req, buffer, sizeof(AnnounceRequest));
+
+        /*************************************************************/
         // sample Annnouncement:<8-byte Connection ID><4-byte Action (1 for announce)><4-byte Transaction ID><20-byte Info_hash><20-byte Peer ID><8-byte Downloaded><8-byte Left><8-byte Uploaded><4-byte Event><4-byte IP address><4-byte Key><4-byte Num Want><2-byte Port>
         //  Convert network byte order to host byte order where necessary
+        /*************************************************************/
+
         req.connection_id = ntohll(req.connection_id);
 
         if (valid_connection_ids.find(req.connection_id) == valid_connection_ids.end())
@@ -127,7 +131,10 @@ void processAnnounceRequest(char *buffer, int length, int sockfd, sockaddr_in &c
         // now have to store the peer in database
         storePeerInDatabase(info_hash, peer_id, ip_str, req.port, req.uploaded, req.downloaded, req.left);
 
+        /*************************************************************/
         // sample response:<4-byte Action (1 for announce)><4-byte Transaction ID><Interval><Leechers><Seeders><Peer List (IP:Port)>
+        /*************************************************************/
+
         //  Create a binary response
         std::vector<uint8_t> response;
 
